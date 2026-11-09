@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. The look is a school notebook: graph paper, ink, and the
+ * colours of highlighters and folders. Grade bands map to colours (see
+ * features/catalog/constants.ts) so a grade is recognisable at a glance.
+ */
+@theme {
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --color-paper: #f5f8ff;
+  --color-grid: #e1e9f8;
+  --color-ink: #0e1a3b;
+  --color-ink-soft: #4a5679;
+  --color-cobalt: #2547f5;
+  --color-marker: #ffd23f;
+  --color-folder: #1f9d6b;
+  --color-error: #c8323a;
+
+  --shadow-sticker: 3px 3px 0 0 var(--color-ink);
+  --shadow-sticker-lg: 6px 6px 0 0 var(--color-ink);
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    background-color: var(--color-paper);
+    background-image:
+      linear-gradient(var(--color-grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
+    background-size: 32px 32px;
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--color-cobalt);
+    outline-offset: 3px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
