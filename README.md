@@ -1,4 +1,4 @@
-# Ric Bright school
+# Lumina
 
 A learning platform for Grades 1 to 12. This repository is the first stage: a clean architecture for the backend and frontend, with a working catalog (subjects and courses) running end to end.
 
@@ -97,7 +97,14 @@ frontend/src/
 - **Probes**: liveness and readiness are separate so a database outage does not cause restart loops.
 - **Tests run on in-memory SQLite** for speed. Add a PostgreSQL job in CI for dialect-specific behaviour before relying on it.
 
-## Not built yet (suggested order)
+## Roadmap
+
+Full, task-by-task plans (with priorities, sizes, and acceptance criteria) live next to each project:
+
+- Backend: [`backend/TODO.md`](backend/TODO.md)
+- Frontend: [`frontend/TODO.md`](frontend/TODO.md)
+
+## Not built yet (suggested order, summary)
 
 1. Authentication and roles (student, parent, teacher, admin), then protect the write endpoints and the `status` filter
 2. Lessons, content and enrolments inside `modules/`
