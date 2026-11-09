@@ -1,4 +1,4 @@
-# Lumina
+# Ric Bright school
 
 A learning platform for Grades 1 to 12. This repository is the first stage: a clean architecture for the backend and frontend, with a working catalog (subjects and courses) running end to end.
 
