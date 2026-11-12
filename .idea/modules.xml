@@ -3,7 +3,6 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/lumina-api.iml" filepath="$PROJECT_DIR$/.idea/lumina-api.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/ric-bright-school.iml" filepath="$PROJECT_DIR$/.idea/ric-bright-school.iml" />
     </modules>
   </component>
 </project>

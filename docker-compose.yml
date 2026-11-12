@@ -1,9 +1,23 @@
+# Local stack:  docker compose up --build
+#   db       PostgreSQL 17 (port 5432, data kept in the `pgdata` volume)
+#   mailpit  catches every email the API sends: inbox at http://localhost:8025
+#   minio    S3-compatible storage for uploads (console: http://localhost:9001)
+#   minio-init  one-off job: creates the media bucket, then exits
+#   migrate  one-off job: `alembic upgrade head`, then exits
+#   api      FastAPI on http://localhost:8000, starts only after `migrate` succeeded
+#
+# Test database (not started by `up`):  docker compose up -d --wait test-db   (or `make test-db`)
+#   test-db  throwaway PostgreSQL on port 5433, data in memory, used by `make test`
+
+x-postgres-env: &postgres-env
+  POSTGRES_USER: lumina
+  POSTGRES_PASSWORD: lumina
+
 services:
   db:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: lumina
-      POSTGRES_PASSWORD: lumina
+      <<: *postgres-env
       POSTGRES_DB: lumina
     ports:
       - "5432:5432"
@@ -15,17 +29,91 @@ services:
       timeout: 3s
       retries: 10
 
-  api:
-    build: ./backend
+  mailpit:
+    # Local email catcher: nothing leaves your machine. Read the emails at :8025.
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"  # web inbox
+      - "1025:1025"  # SMTP, for the API when it runs outside Docker (make api)
+
+  minio:
+    # Local S3: browsers upload straight to it with links the API signs.
+    image: minio/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: lumina
+      MINIO_ROOT_PASSWORD: lumina-dev-storage-secret
+    ports:
+      - "9000:9000"  # S3 API (the signed upload/download links point here)
+      - "9001:9001"  # web console
+    volumes:
+      - miniodata:/data
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint:
+      - sh
+      - -c
+      - |
+        until mc alias set local http://minio:9000 lumina lumina-dev-storage-secret; do sleep 1; done
+        mc mb --ignore-existing local/lumina-media
+    restart: "no"
+
+  migrate:
+    # Same image as `api` (built once, by the `api` service; Compose does not try to pull it).
+    image: lumina-api:local
     environment:
       LUMINA_ENVIRONMENT: local
       LUMINA_DATABASE_URL: postgresql+asyncpg://lumina:lumina@db:5432/lumina
-      LUMINA_CORS_ORIGINS: '["http://localhost:3000"]'
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
     depends_on:
       db:
         condition: service_healthy
-    # Apply migrations, then serve. (Run migrations as a separate job once you have >1 replica.)
-    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  api:
+    build: .
+    image: lumina-api:local
+    environment:
+      LUMINA_ENVIRONMENT: local
+      LUMINA_DATABASE_URL: postgresql+asyncpg://lumina:lumina@db:5432/lumina
+      # JSON array (see .env.example). Add your frontend's origin here if it differs.
+      LUMINA_CORS_ORIGINS: '["http://localhost:3000"]'
+      # From your shell or `.env` (make bootstrap generates one). The fallback is the
+      # development key, which the API refuses in production.
+      LUMINA_SECRET_KEY: ${LUMINA_SECRET_KEY:-dev-only-insecure-secret-key-change-me-0123456789}
+      # Links in emails point at the web app.
+      LUMINA_FRONTEND_URL: ${LUMINA_FRONTEND_URL:-http://localhost:3000}
+      LUMINA_SMTP_HOST: mailpit
+      LUMINA_SMTP_PORT: "1025"
+      # The API talks to MinIO inside Docker; browsers use the published port.
+      LUMINA_STORAGE_ENDPOINT_URL: http://minio:9000
+      LUMINA_STORAGE_PUBLIC_ENDPOINT_URL: ${LUMINA_STORAGE_PUBLIC_ENDPOINT_URL:-http://localhost:9000}
+      LUMINA_STORAGE_ACCESS_KEY: lumina
+      LUMINA_STORAGE_SECRET_KEY: lumina-dev-storage-secret
+      LUMINA_ENCRYPTION_KEY: ${LUMINA_ENCRYPTION_KEY:-}
+      # Social sign-in: empty values keep a provider switched off (see .env.example).
+      LUMINA_API_PUBLIC_URL: ${LUMINA_API_PUBLIC_URL:-http://localhost:8000}
+      LUMINA_GOOGLE_CLIENT_ID: ${LUMINA_GOOGLE_CLIENT_ID:-}
+      LUMINA_GOOGLE_CLIENT_SECRET: ${LUMINA_GOOGLE_CLIENT_SECRET:-}
+      LUMINA_MICROSOFT_CLIENT_ID: ${LUMINA_MICROSOFT_CLIENT_ID:-}
+      LUMINA_MICROSOFT_CLIENT_SECRET: ${LUMINA_MICROSOFT_CLIENT_SECRET:-}
+      LUMINA_MICROSOFT_TENANT: ${LUMINA_MICROSOFT_TENANT:-common}
+      LUMINA_APPLE_CLIENT_ID: ${LUMINA_APPLE_CLIENT_ID:-}
+      LUMINA_APPLE_TEAM_ID: ${LUMINA_APPLE_TEAM_ID:-}
+      LUMINA_APPLE_KEY_ID: ${LUMINA_APPLE_KEY_ID:-}
+      LUMINA_APPLE_PRIVATE_KEY: ${LUMINA_APPLE_PRIVATE_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+      minio-init:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "8000:8000"
     healthcheck:
@@ -34,20 +122,24 @@ services:
       timeout: 3s
       retries: 5
 
-  web:
-    build:
-      context: ./frontend
-      args:
-        # Inlined into the browser bundle, so it must be reachable from the user's machine.
-        NEXT_PUBLIC_API_URL: http://localhost:8000
+  test-db:
+    image: postgres:17-alpine
+    profiles: ["test"]
     environment:
-      # Server-side rendering talks to the API over the internal Docker network.
-      API_URL: http://api:8000
-    depends_on:
-      api:
-        condition: service_healthy
+      <<: *postgres-env
+      POSTGRES_DB: lumina_test
+    # Durability is pointless for throwaway test data; this makes the suite faster.
+    command: ["postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"]
     ports:
-      - "3000:3000"
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lumina -d lumina_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
 
 volumes:
   pgdata:
+  miniodata:
