@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lumina-api"
+version = "0.1.0"
+description = "Lumina — K-12 learning platform, backend API"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30",
+    "alembic>=1.14",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "argon2-cffi>=23.1",
+    "pyjwt>=2.9",
+    "email-validator>=2.2",
+    "httpx>=0.27",  # social login: token and key endpoints of Google, Microsoft, Apple
+    "cryptography>=43",  # RS256/ES256 for provider tokens, encryption of 2FA secrets
+    "boto3>=1.35",  # S3-compatible media storage (pre-signed uploads and downloads)
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "uv>=0.5",  # only to regenerate requirements*.txt (`make requirements`)
+    "boto3-stubs[s3]>=1.35",  # types for boto3 (mypy --strict)
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["migrations/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "RUF"]
+ignore = ["E501"]  # line length is handled by `ruff format`
+
+[tool.mypy]
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["app"]

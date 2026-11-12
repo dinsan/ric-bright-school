@@ -1,0 +1,19 @@
+# Only pyproject.toml, app/, alembic.ini and migrations/ are copied into the image.
+# Everything below is kept out of the build context to keep builds fast and secrets out.
+.git
+.venv
+__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+tests
+*.db
+.env
+.env.*
+.DS_Store
+__MACOSX
+.github
+docs
+scripts
