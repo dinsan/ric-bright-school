@@ -8,14 +8,8 @@ __pycache__/
 *.egg-info/
 *.db
 
-# Node
-node_modules/
-.next/
-out/
-next-env.d.ts
-*.tsbuildinfo
-
-# Env & OS
+# Env & OS (.env.example is committed on purpose)
 .env
 .env.local
 .DS_Store
+__MACOSX/
